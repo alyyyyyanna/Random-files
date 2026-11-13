@@ -5,23 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AVL simulator</title>
 <style>
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
   body { margin: 0; font-family: "Segoe UI", sans-serif; background: #efe8dc; color: #241c16; }
-  header { background: #241c16; color: #f7f2ea; padding: 16px 20px; }
-  h1 { font-family: Palatino, Georgia, serif; font-size: 28px; margin: 0 0 10px; }
-  form { display: flex; gap: 8px; flex-wrap: wrap; }
-  input[type=text] { flex: 1; min-width: 240px; font: inherit; padding: 8px 10px; border-radius: 8px; border: 0; }
-  button { font: inherit; font-weight: 650; border-radius: 999px; border: 1px solid #d9d0c3; background: #fff; padding: 8px 14px; cursor: pointer; }
-  button.pri, button.on { background: #241c16; color: #fff; border-color: #241c16; }
-  .tabs, #modes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-  #seq { font-family: Consolas, monospace; font-size: 16px; margin: 0 0 8px; min-height: 1.3em; }
-  #seq b { background: #c9d7f2; padding: 0 4px; }
-  #aux { margin: 0 0 8px; color: #6b6258; }
-  main { padding: 14px 18px 28px; max-width: 1100px; margin: 0 auto; }
-  .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
-  #slider { flex: 1; min-width: 120px; accent-color: #241c16; }
-  #label { font-family: Palatino, Georgia, serif; font-size: 22px; margin: 8px 0; }
-  .stage { background: #fffdf9; border: 1px solid #e3d9cc; border-radius: 14px; padding: 10px; overflow: auto; min-height: 280px;
-    background-image: radial-gradient(#e6dccb 1px, transparent 1px); background-size: 22px 22px; }
+  .app { display: grid; grid-template-columns: 280px minmax(0, 1fr); height: 100%; }
+  aside { background: #241c16; color: #f7f2ea; padding: 16px 14px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+  h1 { font-family: Palatino, Georgia, serif; font-size: 26px; margin: 0 0 12px; }
+  form { display: flex; flex-direction: column; gap: 8px; }
+  input[type=text] { width: 100%; font: inherit; padding: 8px 10px; border-radius: 8px; border: 0; box-sizing: border-box; }
+  button { font: inherit; font-weight: 650; border-radius: 999px; border: 1px solid #d9d0c3; background: #fff; color: #241c16; padding: 8px 12px; cursor: pointer; }
+  button.pri, button.on { background: #f3d48a; color: #241c16; border-color: #f3d48a; }
+  .tabs, #modes, .bar { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  #modes button, .tabs button, .bar button { flex: 1; }
+  #seq { font-family: Consolas, monospace; font-size: 14px; line-height: 1.45; margin: 10px 0 4px; max-height: 7.2em; overflow: hidden; }
+  #seq b { background: #c9d7f2; color: #241c16; padding: 0 4px; }
+  #aux { margin: 0; color: #e4c99a; font-size: 13px; }
+  #slider { width: 100%; margin-top: 12px; accent-color: #f3d48a; }
+  #counter { display: block; margin-top: 6px; font-size: 13px; color: #e4c99a; }
+  #label { font-family: Palatino, Georgia, serif; font-size: 18px; margin: 14px 0 0; line-height: 1.25; }
+  .stage { min-width: 0; overflow: hidden; touch-action: none; overscroll-behavior: none;
+    background-color: #fffdf9; background-image: radial-gradient(#e6dccb 1px, transparent 1px); background-size: 22px 22px; }
   svg { display: block; margin: 0 auto; }
   circle.n { fill: #fffdf9; stroke: #2a241e; stroke-width: 2; }
   circle.new { fill: #f6d98a; }
@@ -29,11 +31,16 @@
   circle.up { stroke: #1c6b43; stroke-width: 4; }
   circle.seen { fill: #d9efe3; }
   circle.now { fill: #c9d7f2; stroke: #1d4e89; stroke-width: 3.5; }
-  .err { color: #9f2d20; font-weight: 650; }
+  .err { color: #ffb4a8; font-weight: 650; }
+  @media (max-width: 720px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+    aside { max-height: 46vh; }
+  }
 </style>
 </head>
 <body>
-<header>
+<div class="app">
+<aside>
   <h1>AVL tree simulator</h1>
   <form id="f">
     <input id="nums" type="text" value="8, 17, 29, 36, 50, 24, 59, 70, 77, 4, 13, 33, 47, 54, 66, 73" aria-label="Keys">
@@ -43,16 +50,6 @@
     <button type="button" id="tabIns" class="on">Insert</button>
     <button type="button" id="tabTr">Trace</button>
   </div>
-</header>
-<main>
-  <div class="bar">
-    <button type="button" id="prev">Back</button>
-    <button class="pri" type="button" id="next">Next</button>
-    <button class="pri" type="button" id="play">Play</button>
-    <input id="slider" type="range" min="0" value="0">
-    <span id="counter"></span>
-  </div>
-  <p id="err" class="err" hidden></p>
   <div id="modes" hidden>
     <button type="button" data-m="pre">Preorder</button>
     <button type="button" data-m="in">Inorder</button>
@@ -60,11 +57,20 @@
     <button type="button" data-m="rin">Reverse inorder</button>
     <button type="button" data-m="level">Level order</button>
   </div>
+  <div class="bar">
+    <button type="button" id="prev">Back</button>
+    <button class="pri" type="button" id="next">Next</button>
+    <button class="pri" type="button" id="play">Play</button>
+  </div>
+  <input id="slider" type="range" min="0" value="0">
+  <span id="counter"></span>
+  <p id="err" class="err" hidden></p>
   <h2 id="label"></h2>
   <p id="seq" hidden></p>
   <p id="aux" hidden></p>
-  <div class="stage" id="stage"></div>
-</main>
+</aside>
+<div class="stage" id="stage"></div>
+</div>
 <script>
 "use strict";
 function Node(k){ this.key=k; this.left=this.right=null; this.height=1; }
@@ -309,6 +315,8 @@ document.getElementById("modes").onclick=function(e){
   var m=e.target.getAttribute && e.target.getAttribute("data-m");
   if (m) startTrace(m);
 };
+document.getElementById("stage").addEventListener("touchmove", function(e){ e.preventDefault(); }, { passive: false });
+document.getElementById("stage").addEventListener("wheel", function(e){ if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) e.preventDefault(); }, { passive: false });
 document.addEventListener("keydown", function(e){
   if (e.target.matches("input")) return;
   if (e.key==="ArrowRight") document.getElementById("next").click();
