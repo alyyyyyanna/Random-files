@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>To Do List + Pomodoro</title>
+<link href="https://fonts.googleapis.com/css2?family=Mrs+Saint+Delafield&family=Quicksand:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  /* Theme colors and base layout settings.
+     These CSS custom properties keep the pastel palette consistent across buttons, borders, and accents. */
+  :root {
+    --pink: #ffb7d0;
+    --pink-deep: #f283aa;
+    --cream: #fffafc;
+    --line: #f3c9d9;
+    --ink: #4a3640;
+    --mint: #bfeede;
+  }
+  * { box-sizing: border-box; }
+  /* The page uses a soft gradient background and centers the notebook card on screen. */
+  body {
+    margin: 0; min-height: 100vh;
+    display: flex; justify-content: center; align-items: flex-start;
+    padding: 30px 12px;
+    background: linear-gradient(135deg, #ffe3ee, #e8dcff 60%, #d9f3ff);
+    font-family: 'Quicksand', sans-serif; color: var(--ink);
+  }
+  /* Main notebook card: acts like a paper page with a decorative left-side spiral column. */
+  .notebook {
+    position: relative; width: 100%; max-width: 520px;
+    background: var(--cream);
+    border-radius: 14px 22px 22px 14px;
+    padding: 26px 30px 36px 64px;
+    box-shadow: 0 12px 30px rgba(180,120,160,.3), 0 0 0 4px #fff inset;
+  }
+  /* Decorative spiral rings along the left edge. These are generated in JS with .ring elements. */
+  .rings { position: absolute; left: -14px; top: 18px; bottom: 18px; display: flex; flex-direction: column; justify-content: space-between; }
+  .ring { width: 38px; height: 12px; border-radius: 8px; background: linear-gradient(#fff, #cfc3d6 60%, #a99bb5); box-shadow: 0 2px 3px rgba(0,0,0,.2); }
+  .ring::after { content:''; position:absolute; left:26px; width:10px; height:10px; margin-top:-11px; border-radius:50%; background:#e9d6e4; box-shadow: inset 0 1px 3px rgba(0,0,0,.35); }
+
+  /* Header area separates the page title from the timer controls. */
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; border-bottom: 2px dotted var(--line); padding-bottom: 10px; }
+  /* The title uses a handwritten-style font for the playful notebook feel. */
+  h1 { font-family: 'Mrs Saint Delafield', cursive; font-weight: 400; font-size: 78px; line-height: .85; margin: 0; color: #2d1f27; }
+  h1 span { color: var(--pink-deep); }
+
+  /* Timer panel on the right: large display plus minute/second inputs and action buttons. */
+  .timer { text-align: right; }
+  #display { font-family: 'Share Tech Mono', monospace; font-size: 38px; letter-spacing: 1px; background: #fff; border: 2px solid var(--pink); border-radius: 12px; padding: 2px 10px; display: inline-block; }
+  #display.done { animation: pulse .5s infinite alternate; background: var(--mint); }
+  @keyframes pulse { to { transform: scale(1.07); } }
+  .set { display: flex; gap: 4px; justify-content: flex-end; align-items: center; margin-top: 6px; font-size: 13px; }
+  .set input { width: 46px; border: 2px solid var(--line); border-radius: 8px; padding: 3px 4px; font: inherit; text-align: center; background: #fff; color: var(--ink); }
+  .btns { display: flex; gap: 4px; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; }
+  button { font-family: inherit; cursor: pointer; border: none; }
+  .btn { background: var(--pink); color: #fff; font-weight: 700; padding: 4px 11px; border-radius: 999px; font-size: 13px; transition: transform .1s, background .2s; }
+  .btn:hover { background: var(--pink-deep); transform: translateY(-1px); }
+  .btn.alt { background: #fff; color: var(--pink-deep); border: 2px solid var(--pink); padding: 2px 9px; }
+  .label { font-size: 12px; font-weight: 600; color: var(--pink-deep); margin-top: 4px; min-height: 16px; }
+
+  /* Task input row and list styling: these create the to-do list appearance. */
+  .add { display: flex; gap: 8px; margin: 16px 0 6px; }
+  .add input { flex: 1; border: 2px solid var(--line); border-radius: 12px; padding: 8px 12px; font: inherit; background: #fff; color: var(--ink); }
+  .add input:focus { outline: none; border-color: var(--pink-deep); }
+  .add .btn { font-size: 20px; padding: 0 16px; }
+
+  ul { list-style: none; margin: 0; padding: 0; }
+  li, .blank { display: flex; align-items: center; gap: 12px; height: 34px; border-bottom: 1.5px solid var(--line); }
+  li input[type=checkbox] { appearance: none; width: 18px; height: 18px; border: 2px solid var(--ink); border-radius: 5px; cursor: pointer; display: grid; place-content: center; flex-shrink: 0; background: #fff; }
+  li input[type=checkbox]:checked { background: var(--pink); border-color: var(--pink-deep); }
+  li input[type=checkbox]:checked::after { content: '✓'; color: #fff; font-size: 13px; font-weight: 700; }
+  .blank::before { content:''; width: 18px; height: 18px; border: 2px solid #d9c3cf; border-radius: 5px; flex-shrink: 0; }
+  li .text { flex: 1; font-size: 17px; word-break: break-word; }
+  li.done .text { text-decoration: line-through; text-decoration-thickness: 2px; color: #a58f9a; }
+  .del { background: none; font-size: 17px; opacity: .55; }
+  .del:hover { opacity: 1; transform: scale(1.2); }
+  .history { margin-top: 18px; border-top: 2px dotted var(--line); padding-top: 12px; }
+  .history-head { display: flex; justify-content: space-between; align-items: center; }
+  .history h2 { margin: 0; color: var(--pink-deep); font-size: 16px; }
+  .history-clear { background: none; color: #a58f9a; font: inherit; font-size: 12px; }
+  .history-clear:hover { color: var(--pink-deep); }
+  #historyList { margin-top: 6px; max-height: 150px; overflow-y: auto; }
+  #historyList li { height: auto; min-height: 28px; padding: 5px 0; gap: 8px; font-size: 12px; }
+  #historyList time { color: #a58f9a; white-space: nowrap; }
+  .history-empty { color: #b79aa9; font-size: 12px; padding: 8px 0; }
+  .hint { text-align: center; font-size: 12px; color: #b79aa9; margin-top: 12px; }
+  @media (max-width: 460px) { h1 { font-size: 56px; } #display { font-size: 28px; } .notebook { padding-left: 54px; } }
+</style>
+</head>
+<body>
+<div class="notebook">
+  <!-- The decorative spiral column sits on the left side of the notebook card. -->
+  <div class="rings" id="rings"></div>
+
+  <header>
+    <!-- Header title: a playful "To do List" heading. -->
+    <h1>To do <span>List</span></h1>
+    <div class="timer">
+      <!-- The main timer display in HH:MM:SS format. -->
+      <div id="display">00:00:00</div>
+      <div class="set">
+        <!-- Inputs let the user choose custom minute/second lengths for the timer. -->
+        <input type="number" id="min" min="0" max="999" value="25" aria-label="minutes"> min
+        <input type="number" id="sec" min="0" max="59" value="0" aria-label="seconds"> sec
+      </div>
+      <div class="btns">
+        <!-- Start/Pause toggles the countdown; Reset puts the timer back to the selected duration. -->
+        <button class="btn" id="start">Start</button>
+        <button class="btn alt" id="reset">Reset</button>
+      </div>
+      <div class="btns">
+        <!-- Quick preset buttons for common Pomodoro lengths. -->
+        <button class="btn alt" data-p="25">Focus 25</button>
+        <button class="btn alt" data-p="5">Break 5</button>
+        <button class="btn alt" data-p="15">Long 15</button>
+      </div>
+      <!-- Status text shown while the timer is running, paused, or finished. -->
+      <div class="label" id="label"></div>
+    </div>
+  </header>
+
+  <!-- Task form: the user types a task and submits it to the task list. -->
+  <form class="add" id="form">
+    <input id="newTask" placeholder="Write a task..." autocomplete="off">
+    <button class="btn" aria-label="Add task">+</button>
+  </form>
+
+  <!-- This is where task items are inserted dynamically by the JavaScript. -->
+  <ul id="list"></ul>
+  <div id="blanks"></div>
+
+  <!-- History section tracks completed, deleted, and added task entries. -->
+  <section class="history" aria-labelledby="historyTitle">
+    <div class="history-head">
+      <h2 id="historyTitle">Activity history</h2>
+      <button type="button" class="history-clear" id="clearHistory">Clear history</button>
+    </div>
+    <ul id="historyList" aria-live="polite"></ul>
+  </section>
+
+  <!-- Small footer note explaining this is only a session-based to-do list. -->
+  <div class="hint">Tasks only last while this page is open ♡</div>
+</div>
+
+<script>
+  // The decorative spiral rings are created dynamically so the page has a consistent left-side pattern.
+  const rings = document.getElementById('rings');
+  for (let i = 0; i < 18; i++) { const r = document.createElement('div'); r.className = 'ring'; rings.appendChild(r); }
+
+  // ---------- Tasks ----------
+  // These references point to the task list, the form, and the hidden/blank spacer elements used for layout.
+  const list = document.getElementById('list');
+  const blanks = document.getElementById('blanks');
+  const form = document.getElementById('form');
+  const input = document.getElementById('newTask');
+  const MIN_LINES = 12;
+  const historyList = document.getElementById('historyList');
+  const HISTORY_KEY = 'todoPomodoroHistory';
+  let history = [];
+
+  // Load stored task-history entries from localStorage if available. If parsing fails, we fall back to an empty array.
+  try { history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch (e) { history = []; }
+
+  // renderHistory() draws the list of past actions, such as task added/completed/deleted.
+  function renderHistory() {
+    historyList.innerHTML = '';
+    if (!history.length) {
+      const empty = document.createElement('li'); empty.className = 'history-empty';
+      empty.textContent = 'Your activity will appear here.'; historyList.appendChild(empty); return;
+    }
+    history.forEach(item => {
+      const li = document.createElement('li');
+      const time = document.createElement('time');
+      time.dateTime = item.date; time.textContent = new Date(item.date).toLocaleString();
+      const text = document.createElement('span'); text.textContent = item.text;
+      li.append(time, text); historyList.appendChild(li);
+    });
+  }
+
+  // addHistory() adds a timestamped action to the front of the list and keeps only the 50 most recent events.
+  function addHistory(text) {
+    history.unshift({ text, date: new Date().toISOString() });
+    history = history.slice(0, 50);
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch (e) {}
+    renderHistory();
+  }
+
+  // Clear the saved history when the user clicks the button.
+  document.getElementById('clearHistory').addEventListener('click', () => {
+    history = [];
+    try { localStorage.removeItem(HISTORY_KEY); } catch (e) {}
+    renderHistory();
+  });
+  renderHistory();
+
+  // fillBlanks() keeps the task list visually aligned by creating empty placeholder rows below real tasks.
+  function fillBlanks() {
+    blanks.innerHTML = '';
+    const n = Math.max(0, MIN_LINES - list.children.length);
+    for (let i = 0; i < n; i++) { const d = document.createElement('div'); d.className = 'blank'; blanks.appendChild(d); }
+  }
+
+  // When the form is submitted, a new task is added to the list and also recorded in activity history.
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    addHistory(`Added task: ${text}`);
+    const li = document.createElement('li');
+    const cb = document.createElement('input'); cb.type = 'checkbox';
+    const span = document.createElement('span'); span.className = 'text'; span.textContent = text;
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = '🗑️'; del.title = 'Delete task';
+    cb.addEventListener('change', () => {
+      li.classList.toggle('done', cb.checked);
+      addHistory(`${cb.checked ? 'Completed' : 'Reopened'} task: ${text}`);
+    });
+    del.addEventListener('click', () => { addHistory(`Deleted task: ${text}`); li.remove(); fillBlanks(); });
+    li.append(cb, span, del);
+    list.appendChild(li);
+    input.value = ''; input.focus();
+    fillBlanks();
+  });
+  fillBlanks();
+
+  // ---------- Timer ----------
+  // These variables reference the timer display and controls, and track current countdown state.
+  const display = document.getElementById('display');
+  const label = document.getElementById('label');
+  const startBtn = document.getElementById('start');
+  const minI = document.getElementById('min');
+  const secI = document.getElementById('sec');
+  let total = 25 * 60, remaining = total, endTime = 0, tick = null;
+
+  // pad() ensures the time display always has two digits for hours/minutes/seconds.
+  const pad = n => String(n).padStart(2, '0');
+
+  // show() updates the visible timer text in HH:MM:SS format.
+  function show(s) {
+    display.textContent = `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s % 3600 / 60))}:${pad(s % 60)}`;
+  }
+
+  // readInputs() converts the selected minutes and seconds into total seconds and refreshes the display.
+  function readInputs() {
+    total = Math.max(0, (+minI.value || 0) * 60 + (+secI.value || 0));
+    remaining = total; show(remaining);
+  }
+
+  // stop() clears the interval and resets the button text back to "Start".
+  function stop() { clearInterval(tick); tick = null; startBtn.textContent = 'Start'; }
+
+  // beep() plays a short chime when the timer reaches zero, using browser audio APIs if available.
+  function beep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [0, .3, .6].forEach(t => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+        g.gain.setValueAtTime(.2, ctx.currentTime + t);
+        g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + t + .25);
+        o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + .25);
+      });
+    } catch (e) {}
+  }
+
+  // Start/Pause toggle: if a timer is running, it pauses; otherwise it starts a new countdown.
+  startBtn.addEventListener('click', () => {
+    if (tick) { stop(); label.textContent = 'Paused ⏸'; return; }
+    if (remaining <= 0) readInputs();
+    if (remaining <= 0) return;
+    display.classList.remove('done');
+    endTime = Date.now() + remaining * 1000;
+    startBtn.textContent = 'Pause';
+    label.textContent = 'Stay focused ♡';
+    tick = setInterval(() => {
+      remaining = Math.max(0, Math.round((endTime - Date.now()) / 1000));
+      show(remaining);
+      if (remaining <= 0) {
+        stop(); beep();
+        display.classList.add('done');
+        label.textContent = "Time's up! 🎉";
+        addHistory('Pomodoro timer completed');
+      }
+    }, 250);
+  });
+
+  // Reset restores the selected duration and clears the current countdown state.
+  document.getElementById('reset').addEventListener('click', () => {
+    stop(); display.classList.remove('done'); label.textContent = ''; readInputs();
+  });
+
+  // Preset buttons set a standard focus/break length and immediately update the timer. 
+  document.querySelectorAll('[data-p]').forEach(b => b.addEventListener('click', () => {
+    stop(); display.classList.remove('done'); label.textContent = '';
+    minI.value = b.dataset.p; secI.value = 0; readInputs();
+  }));
+
+  // When the minute/second inputs change, update only if the timer is not currently running.
+  [minI, secI].forEach(el => el.addEventListener('input', () => { if (!tick) readInputs(); }));
+  readInputs();
+</script>
+</body>
+</html>
