@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AVL simulator</title>
+<style>
+  body { margin: 0; font-family: "Segoe UI", sans-serif; background: #efe8dc; color: #241c16; }
+  header { background: #241c16; color: #f7f2ea; padding: 16px 20px; }
+  h1 { font-family: Palatino, Georgia, serif; font-size: 28px; margin: 0 0 10px; }
+  form { display: flex; gap: 8px; flex-wrap: wrap; }
+  input[type=text] { flex: 1; min-width: 240px; font: inherit; padding: 8px 10px; border-radius: 8px; border: 0; }
+  button { font: inherit; font-weight: 650; border-radius: 999px; border: 1px solid #d9d0c3; background: #fff; padding: 8px 14px; cursor: pointer; }
+  button.pri, button.on { background: #241c16; color: #fff; border-color: #241c16; }
+  .tabs, #modes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  #seq { font-family: Consolas, monospace; font-size: 16px; margin: 0 0 8px; min-height: 1.3em; }
+  #seq b { background: #c9d7f2; padding: 0 4px; }
+  #aux { margin: 0 0 8px; color: #6b6258; }
+  main { padding: 14px 18px 28px; max-width: 1100px; margin: 0 auto; }
+  .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  #slider { flex: 1; min-width: 120px; accent-color: #241c16; }
+  #label { font-family: Palatino, Georgia, serif; font-size: 22px; margin: 8px 0; }
+  .stage { background: #fffdf9; border: 1px solid #e3d9cc; border-radius: 14px; padding: 10px; overflow: auto; min-height: 280px;
+    background-image: radial-gradient(#e6dccb 1px, transparent 1px); background-size: 22px 22px; }
+  svg { display: block; margin: 0 auto; }
+  circle.n { fill: #fffdf9; stroke: #2a241e; stroke-width: 2; }
+  circle.new { fill: #f6d98a; }
+  circle.bad { fill: #f6c7c0; stroke: #9f2d20; stroke-width: 3; }
+  circle.up { stroke: #1c6b43; stroke-width: 4; }
+  circle.seen { fill: #d9efe3; }
+  circle.now { fill: #c9d7f2; stroke: #1d4e89; stroke-width: 3.5; }
+  .err { color: #9f2d20; font-weight: 650; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AVL tree simulator</h1>
+  <form id="f">
+    <input id="nums" type="text" value="8, 17, 29, 36, 50, 24, 59, 70, 77, 4, 13, 33, 47, 54, 66, 73" aria-label="Keys">
+    <button class="pri" type="submit">Simulate</button>
+  </form>
+  <div class="tabs">
+    <button type="button" id="tabIns" class="on">Insert</button>
+    <button type="button" id="tabTr">Trace</button>
+  </div>
+</header>
+<main>
+  <div class="bar">
+    <button type="button" id="prev">Back</button>
+    <button class="pri" type="button" id="next">Next</button>
+    <button class="pri" type="button" id="play">Play</button>
+    <input id="slider" type="range" min="0" value="0">
+    <span id="counter"></span>
+  </div>
+  <p id="err" class="err" hidden></p>
+  <div id="modes" hidden>
+    <button type="button" data-m="pre">Preorder</button>
+    <button type="button" data-m="in">Inorder</button>
+    <button type="button" data-m="post">Postorder</button>
+    <button type="button" data-m="rin">Reverse inorder</button>
+    <button type="button" data-m="level">Level order</button>
+  </div>
+  <h2 id="label"></h2>
+  <p id="seq" hidden></p>
+  <p id="aux" hidden></p>
+  <div class="stage" id="stage"></div>
+</main>
+<script>
+"use strict";
+function Node(k){ this.key=k; this.left=this.right=null; this.height=1; }
+function h(n){ return n ? n.height : 0; }
+function upd(n){ n.height = 1 + Math.max(h(n.left), h(n.right)); }
+function bf(n){ return h(n.left) - h(n.right); }
+function fmt(b){ return b > 0 ? "+"+b : b < 0 ? "\u2212"+(-b) : "0"; }
+function clone(n){
+  if (!n) return null;
+  var l = clone(n.left), r = clone(n.right);
+  return { key:n.key, height:n.height, bf:bf(n), left:l, right:r };
+}
+function rotL(x){ var y=x.right, t=y.left; y.left=x; x.right=t; upd(x); upd(y); return y; }
+function rotR(y){ var x=y.left, t=x.right; x.right=y; y.left=t; upd(y); upd(x); return x; }
+function simulate(keys){
+  var frames=[], root=null;
+  function snap(o){
+    var f={ tree:clone(root), newKey:null, badKey:null, up:null, label:"" };
+    Object.keys(o).forEach(function(k){ f[k]=o[k]; });
+    frames.push(f);
+  }
+  if (!keys.length) { snap({ label:"Empty tree" }); return frames; }
+  keys.forEach(function(key, step){
+    var tag = "Insert "+key+"  ·  "+(step+1)+" / "+keys.length;
+    if (!root){ root=new Node(key); snap({ newKey:key, label:tag+"  ·  root" }); return; }
+    var stack=[], w=root, parent=null, side=null;
+    while (w){
+      if (key===w.key) return;
+      stack.push(w); parent=w;
+      if (key<w.key){ if (!w.left){ side="left"; break; } w=w.left; }
+      else { if (!w.right){ side="right"; break; } w=w.right; }
+    }
+    if (side==="left") parent.left=new Node(key); else parent.right=new Node(key);
+    var bad=null, i;
+    for (i=stack.length-1;i>=0;i--){ upd(stack[i]); if (!bad && Math.abs(bf(stack[i]))>1) bad=stack[i]; }
+    if (!bad){ snap({ newKey:key, label:tag+"  ·  no rotation" }); return; }
+    var b=bf(bad), kind = b>1 && key<bad.left.key ? "LL" : b<-1 && key>bad.right.key ? "RR" : b>1 ? "LR" : "RL";
+    var idx=stack.indexOf(bad), z=bad, p=idx>0?stack[idx-1]:null;
+    var zSide=!p?null:(p.left===z?"left":"right");
+    function lift(){ var j; for (j=idx-1;j>=0;j--) upd(stack[j]); }
+    function attach(neu){ if (!p) root=neu; else if (zSide==="left") p.left=neu; else p.right=neu; }
+    snap({ newKey:key, badKey:z.key, label:tag+"  ·  "+kind+" at "+z.key });
+    if (kind==="LL" || kind==="RR"){
+      var up = kind==="LL" ? z.left.key : z.right.key;
+      var neu = kind==="LL" ? rotR(z) : rotL(z);
+      attach(neu); lift();
+      snap({ newKey:key, up:up, label:tag+"  ·  "+kind+"  ·  "+(kind==="LL"?"right":"left")+" rotate "+z.key });
+    } else if (kind==="LR"){
+      var y=z.left, xk=y.right.key;
+      z.left=rotL(y); for (i=idx;i>=0;i--) upd(stack[i]);
+      snap({ newKey:key, badKey:z.key, up:xk, label:tag+"  ·  LR 1/2  ·  left rotate "+y.key });
+      var upL=z.left.key, neuL=rotR(z); attach(neuL); lift();
+      snap({ newKey:key, up:upL, label:tag+"  ·  LR 2/2  ·  right rotate "+z.key });
+    } else {
+      var yR=z.right, xkR=yR.left.key;
+      z.right=rotR(yR); for (i=idx;i>=0;i--) upd(stack[i]);
+      snap({ newKey:key, badKey:z.key, up:xkR, label:tag+"  ·  RL 1/2  ·  right rotate "+yR.key });
+      var upR=z.right.key, neuR=rotL(z); attach(neuR); lift();
+      snap({ newKey:key, up:upR, label:tag+"  ·  RL 2/2  ·  left rotate "+z.key });
+    }
+  });
+  return frames;
+}
+var NS="http://www.w3.org/2000/svg", R=28, GX=84, GY=96;
+function se(n,a){ var e=document.createElementNS(NS,n); if(a) Object.keys(a).forEach(function(k){ e.setAttribute(k,a[k]); }); return e; }
+function draw(host, tree, opt){
+  host.innerHTML="";
+  if (!tree){ host.textContent="Empty"; return; }
+  var nodes=[], edges=[], c=0;
+  (function walk(n,d,pk,side){
+    if (n.left) walk(n.left,d+1,n.key,"L");
+    var x=c++;
+    nodes.push({ key:n.key, x:x, y:d, bf:(n.left?n.left.height:0)-(n.right?n.right.height:0) });
+    if (pk!=null) edges.push([pk,n.key,side]);
+    if (n.right) walk(n.right,d+1,n.key,"R");
+  })(tree,0,null,null);
+  var pad=52, maxX=0, maxY=0, by={};
+  nodes.forEach(function(n){ n.px=pad+n.x*GX; n.py=pad+n.y*GY; if(n.px>maxX)maxX=n.px; if(n.py>maxY)maxY=n.py; by[n.key]=n; });
+  var W=maxX+pad, H=maxY+pad;
+  var svg=se("svg",{viewBox:"0 0 "+W+" "+H});
+  svg.style.cssText="width:100%;max-width:"+W+"px;height:auto;display:block";
+  function edge(a,b,side){
+    var dx=b.px-a.px, dy=b.py-a.py, len=Math.hypot(dx,dy)||1;
+    var g=se("g");
+    g.appendChild(se("line",{x1:a.px+dx/len*R,y1:a.py+dy/len*R,x2:b.px-dx/len*R,y2:b.py-dy/len*R,stroke:"#3a322b","stroke-width":"2"}));
+    var t=se("text",{x:(a.px+b.px)/2-dy/len*12,y:(a.py+b.py)/2+dx/len*12,"text-anchor":"middle","font-size":"11",fill:"#7a7168","font-family":"Segoe UI"});
+    t.textContent=side; g.appendChild(t); return g;
+  }
+  edges.forEach(function(e){ svg.appendChild(edge(by[e[0]], by[e[1]], e[2])); });
+  nodes.forEach(function(n){
+    var cls="n";
+    if (opt.seen && opt.seen.indexOf(n.key)!==-1) cls+=" seen";
+    if (opt.cur===n.key) cls+=" now";
+    if (opt.newKey===n.key) cls+=" new";
+    if (opt.badKey===n.key) cls+=" bad";
+    if (opt.up===n.key) cls+=" up";
+    var g=se("g");
+    g.appendChild(se("circle",{cx:n.px,cy:n.py,r:R,class:cls}));
+    var a=se("text",{x:n.px,y:n.py-4,"text-anchor":"middle","font-size":"16","font-weight":"700","font-family":"Segoe UI",fill:"#241c16"});
+    a.textContent=n.key; g.appendChild(a);
+    var b=se("text",{x:n.px,y:n.py+14,"text-anchor":"middle","font-size":"11","font-family":"Segoe UI",fill:Math.abs(n.bf)>1?"#9f2d20":"#6b6258"});
+    b.textContent="BF "+fmt(n.bf); g.appendChild(b);
+    svg.appendChild(g);
+  });
+  host.appendChild(svg);
+}
+function trace(tree, mode){
+  var steps=[];
+  if (!tree) return steps;
+  if (mode==="level"){
+    var q=[tree], out=[];
+    while (q.length){
+      var n=q.shift();
+      out.push(n.key);
+      if (n.left) q.push(n.left);
+      if (n.right) q.push(n.right);
+      steps.push({ key:n.key, out:out.slice(), aux:"queue: "+(q.map(function(x){ return x.key; }).join(" → ") || "—") });
+    }
+    return steps;
+  }
+  var stack=[], out=[];
+  function visit(key){
+    out.push(key);
+    steps.push({ key:key, out:out.slice(), aux:"stack: "+stack.join(" → ") });
+  }
+  function rec(n){
+    if (!n) return;
+    stack.push(n.key);
+    if (mode==="pre") visit(n.key);
+    if (mode==="rin"){ rec(n.right); visit(n.key); rec(n.left); }
+    else { rec(n.left); if (mode==="in") visit(n.key); rec(n.right); if (mode==="post") visit(n.key); }
+    stack.pop();
+  }
+  rec(tree);
+  return steps;
+}
+var NAMES={ pre:"Preorder", in:"Inorder", post:"Postorder", rin:"Reverse inorder", level:"Level order" };
+var frames=[], index=0, timer=null, view="insert";
+var tframes=[], tindex=0, tmode="pre", traceTree=null, traceNote="";
+function stop(){ if(timer) clearInterval(timer); timer=null; document.getElementById("play").textContent="Play"; }
+function paintSeq(keys, cur){
+  var seq=document.getElementById("seq");
+  seq.innerHTML="";
+  keys.forEach(function(k,i){
+    if (i) seq.appendChild(document.createTextNode("  "));
+    if (i===keys.length-1){ var b=document.createElement("b"); b.textContent=k; seq.appendChild(b); }
+    else seq.appendChild(document.createTextNode(String(k)));
+  });
+}
+function showTrace(){
+  var seq=document.getElementById("seq"), aux=document.getElementById("aux");
+  seq.hidden=false; aux.hidden=false;
+  if (!tframes.length){
+    document.getElementById("label").textContent="Build a tree on Insert first";
+    document.getElementById("stage").textContent="Empty";
+    seq.textContent=""; aux.textContent="";
+    document.getElementById("counter").textContent="0 / 0";
+    return;
+  }
+  var f=tframes[tindex];
+  document.getElementById("label").textContent=NAMES[tmode]+"  ·  "+traceNote;
+  paintSeq(f.out, f.key);
+  aux.textContent=f.aux;
+  draw(document.getElementById("stage"), traceTree, { cur:f.key, seen:f.out });
+  var s=document.getElementById("slider");
+  s.max=String(tframes.length-1); s.value=String(tindex);
+  document.getElementById("counter").textContent=(tindex+1)+" / "+tframes.length;
+}
+function show(){
+  if (view==="trace") return showTrace();
+  document.getElementById("seq").hidden=true;
+  document.getElementById("aux").hidden=true;
+  if (!frames.length) return;
+  var f=frames[index];
+  document.getElementById("label").textContent=f.label;
+  draw(document.getElementById("stage"), f.tree, f);
+  var s=document.getElementById("slider");
+  s.max=String(frames.length-1); s.value=String(index);
+  document.getElementById("counter").textContent=(index+1)+" / "+frames.length;
+}
+function startTrace(mode){
+  stop();
+  view="trace"; tmode=mode;
+  document.getElementById("tabIns").className="";
+  document.getElementById("tabTr").className="on";
+  document.getElementById("modes").hidden=false;
+  Array.prototype.forEach.call(document.querySelectorAll("#modes button"), function(b){
+    b.className = b.getAttribute("data-m")===mode ? "on" : "";
+  });
+  traceTree = frames.length ? frames[index].tree : null;
+  traceNote = frames.length ? frames[index].label : "";
+  tframes = trace(traceTree, mode);
+  tindex = 0;
+  showTrace();
+}
+function run(text){
+  stop();
+  var err=document.getElementById("err");
+  var keys=(text.match(/-?\d+/g)||[]).map(Number);
+  var seen={}, uniq=[], dups=[];
+  keys.forEach(function(k){ if(seen[k]) dups.push(k); else { seen[k]=1; uniq.push(k); } });
+  err.hidden=!dups.length;
+  err.textContent = dups.length ? "Skipped duplicates: "+dups.join(", ") : "";
+  if (!uniq.length){ err.hidden=false; err.textContent="Enter numbers, separated by commas or spaces."; frames=[]; document.getElementById("stage").innerHTML=""; document.getElementById("label").textContent=""; return; }
+  frames=simulate(uniq); index=0; show();
+}
+document.getElementById("f").addEventListener("submit", function(e){ e.preventDefault(); run(document.getElementById("nums").value); });
+document.getElementById("prev").onclick=function(){
+  stop();
+  if (view==="trace"){ if(tindex>0){ tindex--; show(); } }
+  else if(index>0){ index--; show(); }
+};
+document.getElementById("next").onclick=function(){
+  stop();
+  if (view==="trace"){ if(tindex<tframes.length-1){ tindex++; show(); } }
+  else if(index<frames.length-1){ index++; show(); }
+};
+document.getElementById("play").onclick=function(){
+  if (timer){ stop(); return; }
+  document.getElementById("play").textContent="Pause";
+  timer=setInterval(function(){
+    if (view==="trace"){ if(tindex>=tframes.length-1){ stop(); return; } tindex++; }
+    else { if(index>=frames.length-1){ stop(); return; } index++; }
+    show();
+  }, 700);
+};
+document.getElementById("slider").oninput=function(e){
+  stop();
+  if (view==="trace") tindex=Number(e.target.value);
+  else index=Number(e.target.value);
+  show();
+};
+document.getElementById("tabIns").onclick=function(){
+  stop(); view="insert";
+  this.className="on";
+  document.getElementById("tabTr").className="";
+  document.getElementById("modes").hidden=true;
+  show();
+};
+document.getElementById("tabTr").onclick=function(){ startTrace(tmode); };
+document.getElementById("modes").onclick=function(e){
+  var m=e.target.getAttribute && e.target.getAttribute("data-m");
+  if (m) startTrace(m);
+};
+document.addEventListener("keydown", function(e){
+  if (e.target.matches("input")) return;
+  if (e.key==="ArrowRight") document.getElementById("next").click();
+  else if (e.key==="ArrowLeft") document.getElementById("prev").click();
+});
+run(document.getElementById("nums").value);
+</script>
+</body>
+</html>
