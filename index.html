@@ -7,21 +7,22 @@
 <style>
   html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
   body { margin: 0; font-family: "Segoe UI", sans-serif; background: #efe8dc; color: #241c16; }
-  .app { display: grid; grid-template-columns: 280px minmax(0, 1fr); height: 100%; }
-  aside { background: #241c16; color: #f7f2ea; padding: 16px 14px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
-  h1 { font-family: Palatino, Georgia, serif; font-size: 26px; margin: 0 0 12px; }
-  form { display: flex; flex-direction: column; gap: 8px; }
-  input[type=text] { width: 100%; font: inherit; padding: 8px 10px; border-radius: 8px; border: 0; box-sizing: border-box; }
-  button { font: inherit; font-weight: 650; border-radius: 999px; border: 1px solid #d9d0c3; background: #fff; color: #241c16; padding: 8px 12px; cursor: pointer; }
+  .app { display: grid; grid-template-columns: 260px minmax(0, 1fr); height: 100%; }
+  aside { background: #241c16; color: #f7f2ea; padding: 14px 12px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; overscroll-behavior: contain; }
+  h1 { font-family: Palatino, Georgia, serif; font-size: 22px; margin: 0 0 10px; }
+  form { display: flex; flex-direction: column; gap: 6px; }
+  input[type=text] { width: 100%; font: inherit; padding: 6px 8px; border-radius: 8px; border: 0; box-sizing: border-box; }
+  button { font: inherit; font-weight: 650; border-radius: 999px; border: 1px solid #d9d0c3; background: #fff; color: #241c16; padding: 5px 8px; cursor: pointer; }
   button.pri, button.on { background: #f3d48a; color: #241c16; border-color: #f3d48a; }
-  .tabs, #modes, .bar { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .tabs, #modes, .bar { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
   #modes button, .tabs button, .bar button { flex: 1; }
-  #seq { font-family: Consolas, monospace; font-size: 14px; line-height: 1.45; margin: 10px 0 4px; max-height: 7.2em; overflow: hidden; }
+  #trace { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 12px; padding: 8px 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.06); }
+  #label { font-family: Palatino, Georgia, serif; font-size: 16px; margin: 0 0 6px; line-height: 1.25; }
+  #seq { font-family: Consolas, monospace; font-size: 14px; line-height: 1.45; margin: 0; overflow: auto; flex: 1; min-height: 0; }
   #seq b { background: #c9d7f2; color: #241c16; padding: 0 4px; }
-  #aux { margin: 0; color: #e4c99a; font-size: 13px; }
-  #slider { width: 100%; margin-top: 12px; accent-color: #f3d48a; }
-  #counter { display: block; margin-top: 6px; font-size: 13px; color: #e4c99a; }
-  #label { font-family: Palatino, Georgia, serif; font-size: 18px; margin: 14px 0 0; line-height: 1.25; }
+  #aux { margin: 6px 0 0; color: #e4c99a; font-size: 13px; }
+  #slider { width: 100%; margin-top: 10px; accent-color: #f3d48a; }
+  #counter { display: block; margin-top: 4px; font-size: 13px; color: #e4c99a; }
   .stage { min-width: 0; overflow: hidden; touch-action: none; overscroll-behavior: none;
     background-color: #fffdf9; background-image: radial-gradient(#e6dccb 1px, transparent 1px); background-size: 22px 22px; }
   svg { display: block; margin: 0 auto; }
@@ -31,7 +32,7 @@
   circle.up { stroke: #1c6b43; stroke-width: 4; }
   circle.seen { fill: #d9efe3; }
   circle.now { fill: #c9d7f2; stroke: #1d4e89; stroke-width: 3.5; }
-  .err { color: #ffb4a8; font-weight: 650; }
+  .err { color: #ffb4a8; font-weight: 650; margin: 8px 0 0; }
   @media (max-width: 720px) {
     .app { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
     aside { max-height: 46vh; }
@@ -65,9 +66,11 @@
   <input id="slider" type="range" min="0" value="0">
   <span id="counter"></span>
   <p id="err" class="err" hidden></p>
-  <h2 id="label"></h2>
-  <p id="seq" hidden></p>
-  <p id="aux" hidden></p>
+  <div id="trace">
+    <h2 id="label"></h2>
+    <p id="seq" hidden></p>
+    <p id="aux" hidden></p>
+  </div>
 </aside>
 <div class="stage" id="stage"></div>
 </div>
